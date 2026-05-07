@@ -11,15 +11,9 @@ logging.basicConfig(
 # =========================
 # EXCEPCIONES PERSONALIZADAS
 # =========================
-class SistemaError(Exception):
-    pass
-
-class ValidacionError(SistemaError):
-    pass
-
-class ReservaError(SistemaError):
-    pass
-
+class SistemaError(Exception): pass
+class ValidacionError(SistemaError): pass
+class ReservaError(SistemaError): pass
 
 # =========================
 # CLASE ABSTRACTA BASE
@@ -29,31 +23,24 @@ class Entidad(ABC):
     def mostrar_info(self):
         pass
 
-
 # =========================
 # CLIENTE
 # =========================
 class Cliente(Entidad):
     def __init__(self, nombre, edad, email):
-        try:
-            if not nombre or not isinstance(nombre, str):
-                raise ValidacionError("Nombre inválido")
-            if edad < 18:
-                raise ValidacionError("El cliente debe ser mayor de edad")
-            if "@" not in email:
-                raise ValidacionError("Email inválido")
+        if not nombre or not isinstance(nombre, str):
+            raise ValidacionError("Nombre inválido: debe ser texto.")
+        if edad < 18:
+            raise ValidacionError(f"Cliente {nombre} es menor de edad.")
+        if "@" not in email:
+            raise ValidacionError(f"Email inválido: {email}")
 
-            self.__nombre = nombre
-            self.__edad = edad
-            self.__email = email
-
-        except Exception as e:
-            logging.error(e)
-            raise
+        self.__nombre = nombre  
+        self.__edad = edad
+        self.__email = email
 
     def mostrar_info(self):
-        return f"Cliente: {self.__nombre}, Edad: {self.__edad}, Email: {self.__email}"
-
+        return f"Cliente: {self.__nombre} | Email: {self.__email}" 
 
 # =========================
 # SERVICIO ABSTRACTO
@@ -71,121 +58,97 @@ class Servicio(ABC):
     def descripcion(self):
         pass
 
-
 # =========================
 # SERVICIOS DERIVADOS
 # =========================
-class ServicioHotel(Servicio):
-    def calcular_costo(self, dias=1, impuesto=0):
-        return (self.precio_base * dias) * (1 + impuesto)
+class ReservaSala(Servicio): 
+    def calcular_costo(self, horas, tasa_limpieza=50): 
+        return (self.precio_base * horas) + tasa_limpieza
 
     def descripcion(self):
-        return "Servicio de hospedaje"
+        return f"Servicio: {self.nombre} (Reserva de salas)"
 
-
-class ServicioTransporte(Servicio):
-    def calcular_costo(self, distancia=1):
-        return self.precio_base * distancia
-
-    def descripcion(self):
-        return "Servicio de transporte"
-
-
-class ServicioTour(Servicio):
-    def calcular_costo(self, personas=1, descuento=0):
-        total = self.precio_base * personas
-        return total - (total * descuento)
+class AlquilerEquipo(Servicio):
+    def calcular_costo(self, dias, descuento=0.10): 
+        total = self.precio_base * dias
+        return total * (1 - descuento)
 
     def descripcion(self):
-        return "Servicio turístico"
-    # =========================
+        return f"Servicio: {self.nombre} (Alquiler de equipos)"
+
+class AsesoriaEspecializada(Servicio):
+    def calcular_costo(self, sesiones, impuesto=0.19): 
+        return (self.precio_base * sesiones) * (1 + impuesto)
+
+    def descripcion(self):
+        return f"Servicio: {self.nombre} (Asesoría especializada)"
+
+# =========================
 # RESERVA
 # =========================
 class Reserva:
-    def __init__(self, cliente, servicio, duracion):
+    def __init__(self, cliente, servicio, cantidad):
         try:
             if not isinstance(cliente, Cliente):
                 raise ReservaError("Cliente inválido")
             if not isinstance(servicio, Servicio):
                 raise ReservaError("Servicio inválido")
-            if duracion <= 0:
-                raise ReservaError("Duración inválida")
- 
+            if cantidad <= 0:
+                raise ReservaError("Cantidad/Duración inválida")
+
             self.cliente = cliente
             self.servicio = servicio
-            self.duracion = duracion
+            self.cantidad = cantidad 
             self.estado = "pendiente"
- 
+
         except Exception as e:
-            logging.error(e)
-            raise
- 
-    def confirmar(self):
+            logging.error(f"Fallo en creación de reserva: {e}")
+            raise ReservaError("Error crítico al inicializar la reserva") from e
+            
+    def procesar(self):
         try:
-            if self.estado != "pendiente":
-                raise ReservaError("Reserva ya procesada")
-            self.estado = "confirmada"
-            print("Reserva confirmada")
- 
+            costo = self.servicio.calcular_costo(self.cantidad)
         except Exception as e:
-            logging.error(e)
-            print("Error al confirmar:", e)
- 
-    def cancelar(self):
-        try:
-            if self.estado == "cancelada":
-                raise ReservaError("Ya está cancelada")
-            self.estado = "cancelada"
-            print("Reserva cancelada")
- 
-        except Exception as e:
-            logging.error(e)
-            print("Error al cancelar:", e)
- 
-    def procesar_pago(self):
-        try:
-            costo = self.servicio.calcular_costo(self.duracion)
-        except TypeError:
-            try:
-                costo = self.servicio.calcular_costo()
-            except Exception as e:
-                logging.error(e)
-                raise ReservaError("Error en cálculo") from e
+            logging.error(f"Error en cálculo de costo: {e}")
+            self.estado = "Fallida"
         else:
-            print(f"Costo calculado: {costo}")
-        finally:
-            print("Proceso de pago finalizado")
- 
- 
+            self.estado = "Confirmada"
+            print(f"Reserva exitosa: {self.servicio.descripcion()} | Costo: {costo}")
+        finally: 
+            print(f"Finalizando proceso de reserva. Estado: {self.estado}")
+
 # =========================
 # SIMULACIÓN (10 OPERACIONES)
 # =========================
-clientes = []
-servicios = []
-reservas = []
- 
 def ejecutar_sistema():
-    operaciones = [
-        lambda: clientes.append(Cliente("Ana", 25, "ana@mail.com")),
-        lambda: clientes.append(Cliente("", 20, "mal")),  # ERROR
-        lambda: servicios.append(ServicioHotel("Hotel", 100)),
-        lambda: servicios.append(ServicioTransporte("Bus", 5)),
-        lambda: servicios.append(ServicioTour("Tour", 50)),
-        lambda: reservas.append(Reserva(clientes[0], servicios[0], 3)),
-        lambda: reservas.append(Reserva("fake", servicios[0], 2)),  # ERROR
-        lambda: reservas[0].confirmar(),
-        lambda: reservas[0].procesar_pago(),
-        lambda: reservas[0].cancelar()
+    print("--- SISTEMA DE GESTIÓN SOFTWARE FJ ---")
+    clientes = []
+    servicios = [
+        ReservaSala("Sala Juntas", 80),
+        AlquilerEquipo("Laptop", 25),
+        AsesoriaEspecializada("Soporte Técnico", 150)
     ]
- 
-    for i, op in enumerate(operaciones):
+
+    operaciones = [
+        lambda: clientes.append(Cliente("Juan Perez", 25, "juan@mail.com")),    
+        lambda: clientes.append(Cliente("Niño", 10, "nino@mail.com")),          
+        lambda: clientes.append(Cliente("Marta", 30, "marta_sin_correo")),      
+        lambda: Reserva(clientes[0], servicios[0], 4).procesar(),            
+        lambda: Reserva(clientes[0], servicios[1], 2).procesar(),               
+        lambda: Reserva(clientes[0], servicios[2], 1).procesar(),            
+        lambda: Reserva("Soy un String", servicios[0], 5).procesar(),          
+        lambda: clientes.append(Cliente("Lucia Gomez", 21, "lucia@mail.com")), 
+        lambda: Reserva(clientes[-1], servicios[1], 3).procesar(),              
+        lambda: Reserva(clientes[0], servicios[0], -5).procesar()               
+    ]
+
+    for i, op in enumerate(operaciones, 1):
+        print(f"\nOperación #{i}:")
         try:
-            print(f"\nOperación {i+1}")
             op()
         except Exception as e:
-            print("Error controlado:", e)
- 
- 
-# EJECUCIÓN
+            logging.error(f"Error controlado en operación {i}: {e}")
+            print(f"CONTROLADO: {e}")
+
 if __name__ == "__main__":
     ejecutar_sistema()
